@@ -11,30 +11,44 @@ import (
 )
 
 func main() {
-	const connectionString = `amqp://guest:guest@localhost:5672/`
-	connection, err := amqp.Dial(connectionString)
+	const rabbitConnString = "amqp://guest:guest@localhost:5672/"
+
+	conn, err := amqp.Dial(rabbitConnString)
 	if err != nil {
 		log.Fatalf("could not connect to RabbitMQ: %v", err)
 	}
-	defer connection.Close()
+	defer conn.Close()
 	fmt.Println("Peril game server connected to RabbitMQ!")
-	gamelogic.PrintServerHelp()
-	amqpChannel, err := connection.Channel()
+
+	publishCh, err := conn.Channel()
 	if err != nil {
-		log.Fatalf("Could not create channel: %v", err)
+		log.Fatalf("could not create channel: %v", err)
 	}
 
-	for {
-		inputs := gamelogic.GetInput()
+	_, queue, err := pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.SimpleQueueDurable,
+	)
+	if err != nil {
+		log.Fatalf("could not subscribe to pause: %v", err)
+	}
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
-		if len(inputs) == 0 {
+	gamelogic.PrintServerHelp()
+
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
 			continue
 		}
-		switch inputs[0] {
+		switch words[0] {
 		case "pause":
-			fmt.Println("Sending a pause message to server...")
+			fmt.Println("Publishing paused game state")
 			err = pubsub.PublishJSON(
-				amqpChannel,
+				publishCh,
 				routing.ExchangePerilDirect,
 				routing.PauseKey,
 				routing.PlayingState{
@@ -44,11 +58,10 @@ func main() {
 			if err != nil {
 				log.Printf("could not publish time: %v", err)
 			}
-
 		case "resume":
-			fmt.Println("Sending a resume message to server...")
+			fmt.Println("Publishing resumes game state")
 			err = pubsub.PublishJSON(
-				amqpChannel,
+				publishCh,
 				routing.ExchangePerilDirect,
 				routing.PauseKey,
 				routing.PlayingState{
@@ -58,14 +71,11 @@ func main() {
 			if err != nil {
 				log.Printf("could not publish time: %v", err)
 			}
-
 		case "quit":
-			fmt.Println("Exiting...")
+			log.Println("goodbye")
 			return
-
 		default:
-			fmt.Println("Couldn't identify the command. Try again.")
-			gamelogic.PrintServerHelp()
+			fmt.Println("unknown command")
 		}
 	}
 }
