@@ -56,7 +56,7 @@ func main() {
 				},
 			)
 			if err != nil {
-				log.Printf("could not publish time: %v", err)
+				log.Printf("could not publish time: %v\n", err)
 			}
 		case "resume":
 			fmt.Println("Publishing resumes game state")
@@ -69,7 +69,7 @@ func main() {
 				},
 			)
 			if err != nil {
-				log.Printf("could not publish time: %v", err)
+				log.Printf("could not publish time: %v\n", err)
 			}
 		case "quit":
 			log.Println("goodbye")
