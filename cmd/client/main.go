@@ -50,10 +50,22 @@ func main() {
 		routing.ArmyMovesPrefix+"."+gs.GetUsername(),
 		routing.ArmyMovesPrefix+".*",
 		pubsub.SimpleQueueTransient,
-		handlerMove(gs),
+		handlerMove(gs, publishCh),
 	)
 	if err != nil {
-		log.Fatalf("could not bind to queue %s: %v", routing.ArmyMovesPrefix+"."+gs.GetUsername(), err)
+		log.Fatalf("could not subscribe to queue %s: %v", routing.ArmyMovesPrefix+"."+gs.GetUsername(), err)
+	}
+
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.SimpleQueueDurable,
+		handlerWar(gs, publishCh),
+	)
+	if err != nil {
+		log.Fatalf("could not subscribe to queue %s: %v", routing.WarRecognitionsPrefix, err)
 	}
 
 	for {
